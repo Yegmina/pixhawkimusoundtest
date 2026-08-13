@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pixhawk Sensor Monitor</title>
+  <style>
+    :root { color-scheme: dark; --bg:#09111e; --card:#101d2f; --line:#233553; --muted:#8da1be; --text:#eaf2ff; --x:#56b4ff; --y:#78dc9a; --z:#ff9276; --accent:#a78bfa; }
+    * { box-sizing:border-box } body { margin:0; padding:28px; font:15px/1.4 Inter,ui-sans-serif,system-ui,sans-serif; background:radial-gradient(circle at top right,#172b50,#09111e 45%); color:var(--text) }
+    header, .toolbar, .card-head, .legend { display:flex; align-items:center; gap:14px } header { justify-content:space-between; max-width:1450px; margin:auto auto 22px } h1 { font-size:24px; margin:0 } .sub { color:var(--muted); margin-top:3px } #state { border:1px solid var(--line); border-radius:99px; padding:7px 12px; color:var(--muted) } #state::before { content:""; display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; background:#f87171 } #state.live::before { background:#5eea91; box-shadow:0 0 12px #5eea91 }
+    .toolbar { max-width:1450px; margin:0 auto 18px; padding:12px 14px; background:#0e1a2b; border:1px solid var(--line); border-radius:12px; flex-wrap:wrap } label { color:var(--muted); font-size:13px } input,select,button { background:#14243a; color:var(--text); border:1px solid #334966; border-radius:7px; padding:7px 9px; font:inherit } input { width:84px } button { cursor:pointer } button.active { background:#534098; border-color:#a78bfa } .spacer { flex:1 }
+    main { max-width:1450px; margin:auto; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px } .card { background:rgba(16,29,47,.93); border:1px solid var(--line); border-radius:14px; overflow:hidden; box-shadow:0 12px 32px #0002 } .card-head { justify-content:space-between; padding:15px 16px 9px } h2 { margin:0; font-size:16px }.unit { color:var(--muted); font-size:12px }.legend { font-size:12px; color:var(--muted) }.legend i { width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:3px }.x{background:var(--x)}.y{background:var(--y)}.z{background:var(--z)} canvas { display:block; width:100%; height:260px; background:linear-gradient(#0d1929,#0a1524) } .values { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line) }.values div { background:#0e1a2b; padding:10px 14px }.values b { display:block; font-size:16px; font-variant-numeric:tabular-nums }.values span { color:var(--muted); font-size:11px } .note { max-width:1450px; color:var(--muted); margin:16px auto 0; font-size:12px } @media(max-width:900px){main{grid-template-columns:1fr}body{padding:16px}.spacer{display:none}}
+  </style>
+</head>
+<body>
+  <header><div><h1>Pixhawk Sensor Monitor</h1><div class="sub">Live IMU and compass telemetry via MAVLink</div></div><div id="state">Connecting</div></header>
+  <section class="toolbar">
+    <label>Time window <select id="window"><option value="10">10 sec</option><option value="30" selected>30 sec</option><option value="60">60 sec</option></select></label>
+    <label>Scale <select id="mode"><option value="auto">Auto</option><option value="manual">Manual</option></select></label>
+    <label>Min <input id="min" type="number" value="-1000" step="any" disabled></label>
+    <label>Max <input id="max" type="number" value="1000" step="any" disabled></label>
+    <button id="pause">Pause</button><button id="clear">Clear</button><span class="spacer"></span><span id="rate" class="sub">— samples/s</span>
+  </section>
+  <section class="toolbar" aria-label="Motion sound controls">
+    <button id="sound">Enable sound</button><strong id="sound-state" class="sub">Sound off</strong>
+    <label>Frequency <input id="frequency" type="range" min="80" max="1600" value="440"><output id="frequency-value">440 Hz</output></label>
+    <label>Max volume <input id="volume" type="range" min="0" max="100" value="35"><output id="volume-value">35%</output></label>
+    <label>Movement limit <input id="motion-threshold" type="number" min="1" value="60" step="1"> mrad/s</label>
+    <label>Start-move mute <input id="mute-seconds" type="number" min="0" max="30" value="3" step="0.5"> sec</label>
+  </section>
+  <main>
+    <section class="card" data-key="accelerometer"><div class="card-head"><div><h2>Accelerometer</h2><span class="unit">mg</span></div><div class="legend"><span><i class="x"></i>X</span><span><i class="y"></i>Y</span><span><i class="z"></i>Z</span></div></div><canvas></canvas><div class="values"></div></section>
+    <section class="card" data-key="gyroscope"><div class="card-head"><div><h2>Gyroscope</h2><span class="unit">mrad/s</span></div><div class="legend"><span><i class="x"></i>X</span><span><i class="y"></i>Y</span><span><i class="z"></i>Z</span></div></div><canvas></canvas><div class="values"></div></section>
+    <section class="card" data-key="magnetometer"><div class="card-head"><div><h2>Compass / Magnetometer</h2><span class="unit">mG</span></div><div class="legend"><span><i class="x"></i>X</span><span><i class="y"></i>Y</span><span><i class="z"></i>Z</span></div></div><canvas></canvas><div class="values"></div></section>
+    <section class="card" data-key="rm3100"><div class="card-head"><div><h2>RM3100 Compass · CAN1</h2><span class="unit">mG · external sensor stream</span></div><div class="legend"><span><i class="x"></i>X</span><span><i class="y"></i>Y</span><span><i class="z"></i>Z</span></div></div><canvas></canvas><div class="values"></div></section>
+  </main>
+  <p class="note">Auto scale recalculates per graph from data currently visible. Manual scale applies the same min/max range to every graph. The sound uses gyroscope movement: starting movement mutes it, then faster motion makes it quieter.</p>
+  <script>
+    const history=[]; let paused=false, count=0, lastRate=Date.now(), audioContext, oscillator, gain, soundOn=false, moving=false, muteUntil=0;
+    const $=s=>document.querySelector(s), colors=['#56b4ff','#78dc9a','#ff9276'];
+    function range(values){ const mode=$('#mode').value; if(mode==='manual') return [+$('#min').value,+$('#max').value]; let lo=Math.min(...values), hi=Math.max(...values); const pad=Math.max((hi-lo)*.12,1); return [lo-pad,hi+pad] }
+    function draw(card){ const key=card.dataset.key, canvas=card.querySelector('canvas'), ctx=canvas.getContext('2d'), width=canvas.clientWidth, height=canvas.clientHeight, dpr=devicePixelRatio||1; canvas.width=width*dpr;canvas.height=height*dpr;ctx.scale(dpr,dpr); const now=Date.now(), windowMs=+$('select#window').value*1000, data=history.filter(p=>p.time>=now-windowMs&&p[key]); const all=data.flatMap(p=>p[key]); if(key==='gyroscope')all.push(+$('#motion-threshold').value,-$('#motion-threshold').value); const [lo,hi]=range(all.length?all:[-1,1]), toY=v=>18+(hi-v)/(hi-lo)*(height-40); ctx.clearRect(0,0,width,height); ctx.strokeStyle='#223550';ctx.lineWidth=1;ctx.font='11px system-ui';ctx.fillStyle='#8da1be'; for(let i=0;i<5;i++){const y=18+i*(height-40)/4;ctx.beginPath();ctx.moveTo(44,y);ctx.lineTo(width-9,y);ctx.stroke();ctx.fillText((hi-(hi-lo)*i/4).toFixed(1),3,y+4)} if(key==='gyroscope'){const t=+$('#motion-threshold').value;ctx.setLineDash([6,4]);ctx.strokeStyle='#f6b44a';for(const v of [t,-t]){ctx.beginPath();ctx.moveTo(44,toY(v));ctx.lineTo(width-9,toY(v));ctx.stroke()}ctx.setLineDash([]);ctx.fillStyle='#f6b44a';ctx.fillText('sound limit',width-78,toY(t)-4)} for(let axis=0;axis<3;axis++){ctx.beginPath();ctx.strokeStyle=colors[axis];ctx.lineWidth=1.7;data.forEach((p,i)=>{const x=44+(p.time-(now-windowMs))/windowMs*(width-53), y=toY(p[key][axis]);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()} const latest=data.at(-1)?.[key]; card.querySelector('.values').innerHTML=(latest||[null,null,null]).map((v,i)=>`<div><span>${'XYZ'[i]}</span><b>${v==null?'—':Number(v).toFixed(2)}</b></div>`).join('') }
+    function repaint(){document.querySelectorAll('.card').forEach(draw)}
+    function updateSound(packet){ if(!soundOn||!packet.gyroscope)return; const score=Math.hypot(...packet.gyroscope), limit=Math.max(1,+$('#motion-threshold').value), now=Date.now(), isMoving=score>=limit; if(isMoving&&!moving)muteUntil=now+Math.max(0,+$('#mute-seconds').value)*1000; moving=isMoving; const level=now<muteUntil?0:(+$('#volume').value/100)*Math.max(.02,1-score/(limit*4)); gain.gain.setTargetAtTime(level,audioContext.currentTime,.05); $('#sound-state').textContent=now<muteUntil?`Muted ${Math.ceil((muteUntil-now)/1000)}s · motion ${score.toFixed(0)}`:`${isMoving?'Moving':'Still'} · motion ${score.toFixed(0)} mrad/s · ${(level*100).toFixed(0)}%`; }
+    function add(packet){ if(paused||(!packet.accelerometer&&!packet.rm3100))return; history.push(packet); const cutoff=Date.now()-60000; while(history[0]?.time<cutoff)history.shift();count++;updateSound(packet);repaint() }
+    $('#mode').onchange=()=>{const manual=$('#mode').value==='manual';$('#min').disabled=$('#max').disabled=!manual;repaint()}; $('#min').oninput=$('#max').oninput=repaint; $('#window').onchange=repaint;
+    $('#pause').onclick=e=>{paused=!paused;e.target.textContent=paused?'Resume':'Pause';e.target.classList.toggle('active',paused)};$('#clear').onclick=()=>{history.length=0;repaint()};
+    $('#frequency').oninput=e=>{const v=+e.target.value;$('#frequency-value').textContent=`${v} Hz`;if(oscillator)oscillator.frequency.setTargetAtTime(v,audioContext.currentTime,.02)}; $('#volume').oninput=e=>$('#volume-value').textContent=`${e.target.value}%`; $('#motion-threshold').oninput=repaint;
+    $('#sound').onclick=()=>{if(!soundOn){audioContext=new AudioContext();oscillator=audioContext.createOscillator();gain=audioContext.createGain();oscillator.type='sine';oscillator.frequency.value=+$('#frequency').value;gain.gain.value=0;oscillator.connect(gain).connect(audioContext.destination);oscillator.start();soundOn=true;$('#sound').textContent='Disable sound';$('#sound').classList.add('active');$('#sound-state').textContent='Listening for IMU movement'}else{oscillator.stop();audioContext.close();audioContext=oscillator=gain=undefined;soundOn=false;$('#sound').textContent='Enable sound';$('#sound').classList.remove('active');$('#sound-state').textContent='Sound off'}};
+    const events=new EventSource('/events');events.onmessage=e=>add(JSON.parse(e.data));events.onerror=()=>{$('#state').className='';$('#state').textContent='Reconnecting'};
+    setInterval(async()=>{try{const s=await fetch('/api/status').then(r=>r.json());$('#state').className=s.connected?'live':'';$('#state').textContent=s.connected?`Live · ${s.port}`:`Disconnected · ${s.error||''}`}catch{} const now=Date.now();$('#rate').textContent=`${(count*1000/(now-lastRate)).toFixed(1)} samples/s`;count=0;lastRate=now;if(!paused)repaint()},1000);
+    addEventListener('resize',repaint); repaint();
+  </script>
+</body>
+</html>
